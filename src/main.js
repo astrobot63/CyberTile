@@ -22,6 +22,7 @@ class App {
     });
     ShopManager.init(this.gameLoop.player);
     this.gameLoop.onCreditsEarned = amount => ShopManager.earn(amount);
+    this.gameLoop.onRunStart = testRun => ShopManager.activateForRun(this.gameLoop, testRun);
 
     this.setupUI();
     this.engine.start();

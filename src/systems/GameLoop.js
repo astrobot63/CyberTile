@@ -25,6 +25,7 @@ export class GameLoop {
     this.platformSpacing = 4;
     this.platformsAhead = 9;
     this.lastLandedPlatformZ = 0;
+    this.powerUps = {};
 
     // Register with engine update loop
     this.engine.addUpdatable(this);
@@ -57,6 +58,7 @@ export class GameLoop {
 
     // Reset player position on starting platform
     this.player.reset(new THREE.Vector3(0, 2, startZ));
+    this.powerUps = this.onRunStart ? this.onRunStart(testRun) : {};
   }
 
   startTestAtJumpCount(jumpCount) {
@@ -125,9 +127,19 @@ export class GameLoop {
 
         if (skippedTiles > 0) this.audio.playSkip();
         else this.audio.playJump();
-        this.score += 10;
+        const scoreGain = this.powerUps.scoreBoost > 0 ? 20 : 10;
+        if (this.powerUps.scoreBoost > 0) this.powerUps.scoreBoost--;
+        this.score += scoreGain;
         this.scoreManager.updateScore(this.score, !this.isTestRun);
-        const coinAmount = 1 + skippedTiles * 3;
+        let coinAmount = 1 + skippedTiles * 3;
+        if (this.powerUps.coinMagnet > 0) {
+          coinAmount += 2;
+          this.powerUps.coinMagnet--;
+        }
+        if (this.powerUps.doubleCoins > 0) {
+          coinAmount *= 2;
+          this.powerUps.doubleCoins--;
+        }
         this.awardCredits(coinAmount);
         this.coinRewards.push(new CoinReward(
           this.scene,
@@ -147,7 +159,7 @@ export class GameLoop {
 
     // Check fall out of bounds
     if (this.player.position.y < -10) {
-      this.gameOver();
+      if (!this.rescueWithShield()) this.gameOver();
     }
 
     // Smooth camera follow
@@ -158,6 +170,25 @@ export class GameLoop {
     );
     this.engine.camera.position.lerp(targetCameraPos, 0.1);
     this.engine.camera.lookAt(this.player.position.x, this.player.position.y, this.player.position.z);
+  }
+
+  rescueWithShield() {
+    if (!this.powerUps.shield) return false;
+    const platform = this.platforms
+      .filter(candidate => !candidate.isTouched && candidate.position.z < this.player.position.z)
+      .sort((a, b) => Math.abs(a.position.z - this.player.position.z) - Math.abs(b.position.z - this.player.position.z))[0];
+    if (!platform) return false;
+
+    this.powerUps.shield = false;
+    this.player.position.set(
+      platform.position.x,
+      platform.position.y + platform.height / 2 + this.player.radius + 0.05,
+      platform.position.z
+    );
+    this.player.velocity.set(0, 0, 0);
+    this.player.mesh.position.copy(this.player.position);
+    this.lastLandedPlatformZ = Math.max(this.lastLandedPlatformZ, platform.position.z);
+    return true;
   }
 
   maintainPlatformRunway() {
