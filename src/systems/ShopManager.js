@@ -18,8 +18,9 @@ export class ShopManager {
   static init(player) {
     this.player = player;
     this.credits = Number(localStorage.getItem('dtts_credits')) || 0;
-    this.owned = JSON.parse(localStorage.getItem('dtts_owned_skins') || '["cyan"]');
-    this.selected = localStorage.getItem('dtts_selected_skin') || 'cyan';
+    this.owned = this.loadOwnedSkins();
+    const savedSelection = localStorage.getItem('dtts_selected_skin') || 'cyan';
+    this.selected = this.owned.includes(savedSelection) ? savedSelection : 'cyan';
     this.powerupInventory = this.loadPowerups();
     if (!this.owned.includes('cyan')) this.owned.push('cyan');
     this.applySelected();
@@ -51,6 +52,17 @@ export class ShopManager {
       return Object.fromEntries(POWERUPS.map(powerup => [powerup.id, Math.max(0, Number(saved[powerup.id]) || 0)]));
     } catch (error) {
       return {};
+    }
+  }
+
+  static loadOwnedSkins() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('dtts_owned_skins') || '["cyan"]');
+      if (!Array.isArray(saved)) return ['cyan'];
+      const validIds = new Set(SHOP_ITEMS.map(item => item.id));
+      return [...new Set(['cyan', ...saved.filter(id => validIds.has(id))])];
+    } catch (error) {
+      return ['cyan'];
     }
   }
 

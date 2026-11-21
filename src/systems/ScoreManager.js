@@ -3,10 +3,8 @@ export class ScoreManager {
   static bestScore = 0;
 
   static init() {
-    const saved = localStorage.getItem('dtts_best_score');
-    if (saved) {
-      this.bestScore = parseInt(saved, 10);
-    }
+    const saved = Number(localStorage.getItem('dtts_best_score'));
+    this.bestScore = Number.isFinite(saved) && saved >= 0 ? Math.floor(saved) : 0;
     this.updateDisplay();
   }
 

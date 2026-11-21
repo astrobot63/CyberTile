@@ -33,8 +33,10 @@ export class AudioManager {
   }
 
   static loadVolume(key) {
-    const saved = Number(localStorage.getItem(key));
-    return localStorage.getItem(key) === null ? 1 : Math.max(0, Math.min(1, saved));
+    const stored = localStorage.getItem(key);
+    if (stored === null) return 1;
+    const saved = Number(stored);
+    return Number.isFinite(saved) ? Math.max(0, Math.min(1, saved)) : 1;
   }
 
   static setSfxVolume(value) {
@@ -62,7 +64,7 @@ export class AudioManager {
   }
 
   static playJump() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0) return;
     try {
       const ctx = this.getAudioContext();
       if (!ctx) return;
@@ -75,7 +77,7 @@ export class AudioManager {
       osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.15);
 
       gain.gain.setValueAtTime(0.3 * this.sfxVolume, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.01 * this.sfxVolume, ctx.currentTime + 0.15);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -88,7 +90,7 @@ export class AudioManager {
   }
 
   static playSkip() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0) return;
     try {
       const ctx = this.getAudioContext();
       if (!ctx) return;
@@ -100,7 +102,7 @@ export class AudioManager {
       osc.frequency.setValueAtTime(760, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(1180, ctx.currentTime + 0.13);
       gain.gain.setValueAtTime(0.24 * this.sfxVolume, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.13);
+      gain.gain.exponentialRampToValueAtTime(0.01 * this.sfxVolume, ctx.currentTime + 0.13);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start();
@@ -111,9 +113,11 @@ export class AudioManager {
   }
 
   static playGameOver() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0) return;
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      ctx.resume();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       
@@ -122,7 +126,7 @@ export class AudioManager {
       osc.frequency.linearRampToValueAtTime(60, ctx.currentTime + 0.5);
 
       gain.gain.setValueAtTime(0.4 * this.sfxVolume, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.01 * this.sfxVolume, ctx.currentTime + 0.5);
 
       osc.connect(gain);
       gain.connect(ctx.destination);

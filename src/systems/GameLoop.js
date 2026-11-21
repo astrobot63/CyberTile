@@ -19,6 +19,7 @@ export class GameLoop {
     this.isPlaying = false;
     this.isPaused = false;
     this.score = 0;
+    this.landedTiles = 0;
     this.background.setTheme(0);
     this.platformSpacing = 4;
     this.platformsAhead = 9;
@@ -37,8 +38,9 @@ export class GameLoop {
     this.isPlaying = true;
     this.isPaused = false;
     this.score = 0;
-    this.background.setTheme(Math.floor(this.score / 750));
-    this.background.prepareWorld(Math.floor(this.score / 750) + 1);
+    this.landedTiles = 0;
+    this.background.setTheme(0);
+    this.background.prepareWorld(1);
     this.scoreManager.updateScore(this.score);
 
     const startZ = 0;
@@ -115,6 +117,7 @@ export class GameLoop {
         ));
         const skippedTiles = Math.max(0, tilesAdvanced - 1);
         this.lastLandedPlatformZ = touchedPlatform.position.z;
+        this.landedTiles++;
 
         if (skippedTiles > 0) this.audio.playSkip();
         else this.audio.playJump();
@@ -138,10 +141,10 @@ export class GameLoop {
           coinAmount,
           skippedTiles > 0
         ));
-        this.background.setTheme(Math.floor(this.score / 750));
-        const jumpsIntoWorld = Math.floor(this.score / 10) % 75;
+        this.background.setTheme(Math.floor(this.landedTiles / 75));
+        const jumpsIntoWorld = this.landedTiles % 75;
         if (jumpsIntoWorld >= 60) {
-          this.background.prepareWorld(Math.floor(this.score / 750) + 1);
+          this.background.prepareWorld(Math.floor(this.landedTiles / 75) + 1);
         }
 
         this.maintainPlatformRunway();

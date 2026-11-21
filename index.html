@@ -136,8 +136,8 @@
       box-shadow: 0 0 18px rgba(255,218,102,.18); font-size: .95rem;
     }
     .shop-notice {
-      position: fixed; top: 24px; left: 50%; z-index: 1000; width: min(520px, 90vw);
-      transform: translate(-50%, -10px); margin: 0; padding: 16px 22px;
+      position: fixed; top: auto; bottom: 24px; left: 50%; z-index: 1000; width: min(520px, 90vw);
+      transform: translate(-50%, 10px); margin: 0; padding: 16px 22px;
       border: 2px solid #ff8299; border-radius: 14px; background: rgba(8, 13, 30, .98);
       box-shadow: 0 0 30px rgba(255, 70, 120, .5); color: #fff; font-size: 1rem;
       font-weight: 700; letter-spacing: .5px; text-align: center; opacity: 0;
@@ -200,6 +200,7 @@
       .shop-screen { padding: 70px 14px 14px; }
       .shop-close { top: 14px; left: 14px; }
       .shop-balance { top: 14px; right: 14px; padding: 9px 12px; font-size: .75rem; }
+      .shop-notice { bottom: max(18px, env(safe-area-inset-bottom)); }
       .shop-items { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
       .music-toggle { top: 88px; right: 18px; }
       .ui-layer { padding: 18px; }

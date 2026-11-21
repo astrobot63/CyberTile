@@ -3,18 +3,15 @@ export class Input {
   static listeners = {};
   static pointerStart = null;
   static touchMovement = { x: 0, z: 0 };
-  static hasKeyboard = false;
   static autoForward = false;
 
   static init() {
-    const hasTouchScreen = navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches;
+    const hasTouchScreen = navigator.maxTouchPoints > 0;
     this.autoForward = hasTouchScreen;
-    this.hasKeyboard = !hasTouchScreen;
 
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
-        this.hasKeyboard = true;
         this.autoForward = false;
       }
       if (this.listeners['keydown']) {
@@ -46,7 +43,14 @@ export class Input {
     window.addEventListener('pointermove', e => this.updateTouchMovement(e));
     window.addEventListener('pointerup', e => this.endTouch(e));
     window.addEventListener('pointercancel', e => this.endTouch(e));
-    window.addEventListener('blur', () => this.endTouch());
+    const clearInput = () => {
+      this.keys = {};
+      this.endTouch();
+    };
+    window.addEventListener('blur', clearInput);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) clearInput();
+    });
   }
 
   static updateTouchMovement(event) {
