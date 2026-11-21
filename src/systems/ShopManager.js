@@ -53,15 +53,17 @@ export class ShopManager {
     const container = document.getElementById('shop-items');
     if (!balance || !container) return;
     balance.textContent = this.credits;
+    const hudCoins = document.getElementById('coins-val');
+    if (hudCoins) hudCoins.textContent = this.credits;
     container.innerHTML = SHOP_ITEMS.map(item => {
       const owned = this.owned.includes(item.id);
       const selected = this.selected === item.id;
-      const label = selected ? 'EQUIPPED' : owned ? 'EQUIP' : `${item.price} CREDITS`;
+      const label = selected ? 'EQUIPPED' : owned ? 'EQUIP' : `${item.price} COINS`;
       const disabled = selected || (!owned && this.credits < item.price);
       return `<article class="shop-item">
         <div class="skin-preview" style="background:${item.color};color:${item.color}"></div>
         <h2>${item.name}</h2>
-        <p>${owned ? 'Ball style' : `Unlock for ${item.price} credits`}</p>
+        <p>${owned ? 'Ball style' : `Unlock for ${item.price} coins`}</p>
         <button class="btn" data-shop-item="${item.id}" ${disabled ? 'disabled' : ''}>${label}</button>
       </article>`;
     }).join('');

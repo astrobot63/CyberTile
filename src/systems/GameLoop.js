@@ -16,6 +16,7 @@ export class GameLoop {
 
     this.isPlaying = false;
     this.score = 0;
+    this.background.setTheme(0);
     this.platformSpacing = 4;
     this.platformsAhead = 9;
 
@@ -30,6 +31,7 @@ export class GameLoop {
   start() {
     this.isPlaying = true;
     this.score = 0;
+    this.background.setTheme(0);
     this.scoreManager.updateScore(0);
 
     // Clear existing platforms
@@ -88,6 +90,7 @@ export class GameLoop {
         this.score += 10;
         this.scoreManager.updateScore(this.score);
         this.awardCredits(10);
+        this.background.setTheme(Math.floor(this.score / 750));
 
         this.maintainPlatformRunway();
       }

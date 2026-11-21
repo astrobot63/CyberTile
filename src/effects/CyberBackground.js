@@ -1,5 +1,28 @@
 import * as THREE from 'three';
 
+const CITY_THEMES = [
+  {
+    name: 'Neon District', background: 0x05050a, fog: 0x05050a,
+    buildings: [0x202849, 0x352044, 0x173849], emissive: [0x111c42, 0x291044, 0x0b3448],
+    neon: [0x00d9ff, 0xff20bd, 0xffbd55], glass: 0x123b5c, glassGlow: 0x06365c, stars: [0x00d9ff, 0xb000ff]
+  },
+  {
+    name: 'Arctic Signal', background: 0x040c18, fog: 0x040c18,
+    buildings: [0x1b3144, 0x222b4c, 0x163c49], emissive: [0x0b3044, 0x142b55, 0x07504b],
+    neon: [0x70f7ff, 0x70a5ff, 0xffffff], glass: 0x12495f, glassGlow: 0x087295, stars: [0xa9ffff, 0x608bff]
+  },
+  {
+    name: 'Solar District', background: 0x120713, fog: 0x120713,
+    buildings: [0x41243a, 0x452c3c, 0x34304c], emissive: [0x501636, 0x602044, 0x33244f],
+    neon: [0xff795e, 0xff48bd, 0xffd26f], glass: 0x51294a, glassGlow: 0x86204e, stars: [0xffcf7a, 0xff77d4]
+  },
+  {
+    name: 'Jade Circuit', background: 0x04100f, fog: 0x04100f,
+    buildings: [0x173b33, 0x203348, 0x302947], emissive: [0x0d4d3c, 0x12445a, 0x401e54],
+    neon: [0x6bffb0, 0x00d9ff, 0xd28cff], glass: 0x16443b, glassGlow: 0x0d8066, stars: [0x82ffc6, 0x95a2ff]
+  }
+];
+
 // A camera-following city canyon, scrolling traffic, and drifting starfield.
 export class CyberBackground {
   constructor(scene) {
@@ -13,6 +36,7 @@ export class CyberBackground {
     this.stars = this.createStarfield();
     this.createCity();
     scene.add(this.city, this.stars);
+    this.setTheme(0);
   }
 
   createStarfield() {
@@ -60,6 +84,7 @@ export class CyberBackground {
     const buildingGeometry = new THREE.BoxGeometry(1, 1, 1);
     const trimGeometry = new THREE.BoxGeometry(1, 1, 1);
     const windowMaterials = [cyan, pink, gold];
+    this.themeMaterials = { buildingMaterials, neonMaterials: [cyan, pink, gold], glass };
 
     // Surround the player with towers in all directions, leaving a clear central lane.
     for (let side = -1; side <= 1; side += 2) {
@@ -220,5 +245,32 @@ export class CyberBackground {
         item.mesh.position.y = item.mesh.userData.baseY + Math.sin(this.time * item.speed + item.mesh.userData.phase) * 0.6;
       }
     }
+  }
+
+  setTheme(themeNumber) {
+    const themeIndex = ((themeNumber % CITY_THEMES.length) + CITY_THEMES.length) % CITY_THEMES.length;
+    if (this.activeThemeIndex === themeIndex) return;
+    this.activeThemeIndex = themeIndex;
+    const theme = CITY_THEMES[themeIndex];
+
+    this.scene.background.setHex(theme.background);
+    if (this.scene.fog) this.scene.fog.color.setHex(theme.fog);
+
+    this.themeMaterials.buildingMaterials.forEach((material, index) => {
+      material.color.setHex(theme.buildings[index]);
+      material.emissive.setHex(theme.emissive[index]);
+    });
+    this.themeMaterials.neonMaterials.forEach((material, index) => material.color.setHex(theme.neon[index]));
+    this.themeMaterials.glass.color.setHex(theme.glass);
+    this.themeMaterials.glass.emissive.setHex(theme.glassGlow);
+
+    const starColors = this.stars.geometry.attributes.color;
+    const colorA = new THREE.Color(theme.stars[0]);
+    const colorB = new THREE.Color(theme.stars[1]);
+    for (let i = 0; i < starColors.count; i++) {
+      const color = i % 4 === 0 ? colorB : colorA;
+      starColors.setXYZ(i, color.r, color.g, color.b);
+    }
+    starColors.needsUpdate = true;
   }
 }

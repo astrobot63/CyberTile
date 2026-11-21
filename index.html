@@ -118,6 +118,7 @@
       border-radius: 10px;
       backdrop-filter: blur(5px);
     }
+    .hud-coins { color: #ffda66; }
     .menu-actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; }
     .shop-trigger {
       width: 62px; height: 62px; border: 1px solid rgba(0,255,255,.65); border-radius: 50%;
@@ -136,14 +137,22 @@
     .shop-item .btn { font-size: .75rem; padding: 9px 13px; margin: 3px; }
     .shop-close { margin-top: 12px; }
     .music-toggle {
-      position: fixed; top: 22px; right: 24px; z-index: 40; pointer-events: auto;
+      position: fixed; top: 94px; right: 30px; z-index: 40; pointer-events: auto;
       border: 1px solid rgba(0,255,255,.45); border-radius: 24px;
       padding: 10px 15px; color: #bafcff; background: rgba(8,18,38,.88);
       font: 700 .72rem 'Orbitron', sans-serif; letter-spacing: 1px; cursor: pointer;
       box-shadow: 0 0 16px rgba(0,255,255,.18); backdrop-filter: blur(8px);
     }
     .music-toggle:hover { border-color: #00ffff; box-shadow: 0 0 22px rgba(0,255,255,.45); }
-    @media (max-width: 600px) { h1 { font-size: 2.4rem; } .shop-screen { padding: 14px; } .shop-items { grid-template-columns: repeat(2, minmax(130px, 1fr)); } }
+    @media (max-width: 600px) {
+      h1 { font-size: 2.4rem; }
+      .shop-screen { padding: 14px; }
+      .shop-items { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
+      .music-toggle { top: 88px; right: 18px; }
+      .ui-layer { padding: 18px; }
+      .hud-top { gap: 6px; font-size: .76rem; }
+      .hud-stat { padding: 7px 8px; white-space: nowrap; }
+    }
   </style>
 </head>
 <body>
@@ -154,6 +163,7 @@
   <div class="ui-layer">
     <div class="hud-top">
       <div class="hud-stat">SCORE: <span id="score-val">0</span></div>
+      <div class="hud-stat hud-coins">🪙 COINS: <span id="coins-val">0</span></div>
       <div class="hud-stat">BEST: <span id="best-val">0</span></div>
     </div>
   </div>
@@ -170,7 +180,7 @@
 
   <div id="shop-screen" class="screen shop-screen hidden interactive" aria-label="Shop">
     <h1>NEON SHOP</h1>
-    <p class="shop-balance">CREDITS: <span id="credits-val">0</span></p>
+    <p class="shop-balance">🪙 COINS: <span id="credits-val">0</span></p>
     <div id="shop-items" class="shop-items"></div>
     <button class="btn shop-close" id="shop-close-btn">BACK</button>
   </div>
