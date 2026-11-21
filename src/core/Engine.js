@@ -34,9 +34,11 @@ export class Engine {
 
   setupLights() {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    ambientLight.name = 'worldAmbientLight';
     this.scene.add(ambientLight);
 
     const dirLight = new THREE.DirectionalLight(0x00ffff, 0.8);
+    dirLight.name = 'worldDirectionalLight';
     dirLight.position.set(10, 20, 10);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
@@ -44,6 +46,7 @@ export class Engine {
     this.scene.add(dirLight);
 
     const pointLight = new THREE.PointLight(0xff00ff, 1, 50);
+    pointLight.name = 'worldAccentLight';
     pointLight.position.set(-10, 5, -10);
     this.scene.add(pointLight);
   }
@@ -69,7 +72,9 @@ export class Engine {
 
   start() {
     this.renderer.setAnimationLoop(() => {
-      const delta = this.clock.getDelta();
+      // Ignore long frame stalls in physics so a heavy background transition
+      // cannot send the player through a platform or straight into a fall.
+      const delta = Math.min(this.clock.getDelta(), 0.05);
 
       for (const obj of this.updatables) {
         if (obj.update && typeof obj.update === 'function') {

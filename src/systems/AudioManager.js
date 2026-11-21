@@ -13,6 +13,8 @@ export class AudioManager {
   static musicTimer = null;
   static melodyTimer = null;
   static chordIndex = 0;
+  static sfxVolume = 1;
+  static musicVolume = 1;
 
   static getAudioContext() {
     if (!this.audioContext) {
@@ -26,12 +28,45 @@ export class AudioManager {
   static init() {
     // Synthesize or set up lightweight audio effects using Web Audio API or fallback synth sounds
     // To keep things robust without external asset dependencies, we use clean oscillator tones or placeholders.
+    this.sfxVolume = this.loadVolume('cybertile_sfx_volume');
+    this.musicVolume = this.loadVolume('cybertile_music_volume');
+  }
+
+  static loadVolume(key) {
+    const saved = Number(localStorage.getItem(key));
+    return localStorage.getItem(key) === null ? 1 : Math.max(0, Math.min(1, saved));
+  }
+
+  static setSfxVolume(value) {
+    this.sfxVolume = Math.max(0, Math.min(1, Number(value)));
+    localStorage.setItem('cybertile_sfx_volume', String(this.sfxVolume));
+  }
+
+  static setMusicVolume(value) {
+    this.musicVolume = Math.max(0, Math.min(1, Number(value)));
+    localStorage.setItem('cybertile_music_volume', String(this.musicVolume));
+    if (this.musicBus && this.audioContext) {
+      const now = this.audioContext.currentTime;
+      this.musicBus.master.gain.setTargetAtTime(this.musicVolume * 0.34, now, 0.08);
+    }
+  }
+
+  static resetVolumes() {
+    localStorage.removeItem('cybertile_sfx_volume');
+    localStorage.removeItem('cybertile_music_volume');
+    this.sfxVolume = 1;
+    this.musicVolume = 1;
+    if (this.musicBus && this.audioContext) {
+      this.musicBus.master.gain.setTargetAtTime(0.34, this.audioContext.currentTime, 0.08);
+    }
   }
 
   static playJump() {
     if (this.isMuted) return;
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      ctx.resume();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       
@@ -39,7 +74,7 @@ export class AudioManager {
       osc.frequency.setValueAtTime(300, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.15);
 
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.setValueAtTime(0.3 * this.sfxVolume, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
 
       osc.connect(gain);
@@ -49,6 +84,29 @@ export class AudioManager {
       osc.stop(ctx.currentTime + 0.15);
     } catch (e) {
       // AudioContext not allowed before user interaction
+    }
+  }
+
+  static playSkip() {
+    if (this.isMuted) return;
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(760, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1180, ctx.currentTime + 0.13);
+      gain.gain.setValueAtTime(0.24 * this.sfxVolume, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.13);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.13);
+    } catch (e) {
+      // AudioContext may not be available before user interaction.
     }
   }
 
@@ -63,7 +121,7 @@ export class AudioManager {
       osc.frequency.setValueAtTime(200, ctx.currentTime);
       osc.frequency.linearRampToValueAtTime(60, ctx.currentTime + 0.5);
 
-      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.setValueAtTime(0.4 * this.sfxVolume, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
 
       osc.connect(gain);
@@ -90,7 +148,7 @@ export class AudioManager {
     const feedback = context.createGain();
     const delayWet = context.createGain();
     master.gain.setValueAtTime(0, context.currentTime);
-    master.gain.linearRampToValueAtTime(0.34, context.currentTime + 7);
+    master.gain.linearRampToValueAtTime(this.musicVolume * 0.34, context.currentTime + 7);
     lowPass.type = 'lowpass';
     lowPass.frequency.value = 720;
     lowPass.Q.value = 0.5;

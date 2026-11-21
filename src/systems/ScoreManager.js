@@ -10,9 +10,9 @@ export class ScoreManager {
     this.updateDisplay();
   }
 
-  static updateScore(newScore) {
+  static updateScore(newScore, updateBest = true) {
     this.score = newScore;
-    if (this.score > this.bestScore) {
+    if (updateBest && this.score > this.bestScore) {
       this.bestScore = this.score;
       localStorage.setItem('dtts_best_score', this.bestScore);
     }
@@ -24,6 +24,13 @@ export class ScoreManager {
       this.bestScore = finalScore;
       localStorage.setItem('dtts_best_score', this.bestScore);
     }
+    this.updateDisplay();
+  }
+
+  static resetProgress() {
+    this.score = 0;
+    this.bestScore = 0;
+    localStorage.removeItem('dtts_best_score');
     this.updateDisplay();
   }
 

@@ -1,10 +1,10 @@
 const SHOP_ITEMS = [
   { id: 'cyan', name: 'CYAN CORE', color: '#00ffff', price: 0 },
-  { id: 'magenta', name: 'MAGENTA PULSE', color: '#ff20bd', price: 50 },
-  { id: 'gold', name: 'SOLAR FLARE', color: '#ffbd55', price: 100 },
-  { id: 'lime', name: 'TOXIC CIRCUIT', color: '#a6ff00', price: 150 },
-  { id: 'violet', name: 'VOID ORB', color: '#9b5cff', price: 200 },
-  { id: 'ice', name: 'ICE PHOTON', color: '#91f5ff', price: 250 }
+  { id: 'magenta', name: 'MAGENTA PULSE', color: '#ff20bd', price: 100 },
+  { id: 'gold', name: 'SOLAR FLARE', color: '#ffbd55', price: 250 },
+  { id: 'lime', name: 'TOXIC CIRCUIT', color: '#a6ff00', price: 400 },
+  { id: 'violet', name: 'VOID ORB', color: '#9b5cff', price: 600 },
+  { id: 'ice', name: 'ICE PHOTON', color: '#91f5ff', price: 800 }
 ];
 
 export class ShopManager {
@@ -24,6 +24,17 @@ export class ShopManager {
     this.render();
   }
 
+  static resetProgress() {
+    this.credits = 0;
+    this.owned = ['cyan'];
+    this.selected = 'cyan';
+    localStorage.removeItem('dtts_credits');
+    localStorage.removeItem('dtts_owned_skins');
+    localStorage.removeItem('dtts_selected_skin');
+    this.applySelected();
+    this.render();
+  }
+
   static buyOrSelect(id) {
     const item = SHOP_ITEMS.find(entry => entry.id === id);
     if (!item) return;
@@ -36,11 +47,12 @@ export class ShopManager {
       localStorage.setItem('dtts_credits', String(this.credits));
       localStorage.setItem('dtts_owned_skins', JSON.stringify(this.owned));
     } else {
-      return;
+      return false;
     }
     localStorage.setItem('dtts_selected_skin', this.selected);
     this.applySelected();
     this.render();
+    return true;
   }
 
   static applySelected() {
@@ -59,7 +71,7 @@ export class ShopManager {
       const owned = this.owned.includes(item.id);
       const selected = this.selected === item.id;
       const label = selected ? 'EQUIPPED' : owned ? 'EQUIP' : `${item.price} COINS`;
-      const disabled = selected || (!owned && this.credits < item.price);
+      const disabled = selected;
       return `<article class="shop-item">
         <div class="skin-preview" style="background:${item.color};color:${item.color}"></div>
         <h2>${item.name}</h2>
@@ -68,7 +80,21 @@ export class ShopManager {
       </article>`;
     }).join('');
     container.querySelectorAll('[data-shop-item]').forEach(button => {
-      button.addEventListener('click', () => this.buyOrSelect(button.dataset.shopItem));
+      button.addEventListener('click', () => {
+        const success = this.buyOrSelect(button.dataset.shopItem);
+        if (!success) this.showNotice('Not enough coins for this skin.');
+      });
     });
+  }
+
+  static showNotice(message) {
+    const notice = document.getElementById('shop-notice');
+    if (!notice) return;
+    notice.textContent = message;
+    notice.classList.add('visible');
+    window.clearTimeout(this.noticeTimer);
+    this.noticeTimer = window.setTimeout(() => {
+      notice.classList.remove('visible');
+    }, 2200);
   }
 }

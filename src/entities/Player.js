@@ -69,6 +69,9 @@ export class Player {
     // Platform Collision Detection
     this.isGrounded = false;
     for (const platform of platforms) {
+      // Shattered tiles are gone from the world, so let the player fall
+      // through their former position instead of colliding with an invisible tile.
+      if (platform.isTouched) continue;
       if (platform.checkCollision(this.position, this.radius)) {
         // Land on platform if falling
         if (this.velocity.y <= 0 && this.position.y >= platform.position.y) {

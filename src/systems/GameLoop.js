@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Player } from '../entities/Player.js';
 import { Platform } from '../entities/Platform.js';
 import { CyberBackground } from '../effects/CyberBackground.js';
+import { CoinReward } from '../effects/CoinReward.js';
 
 export class GameLoop {
   constructor({ engine, audio, score }) {
@@ -13,12 +14,17 @@ export class GameLoop {
     this.background = new CyberBackground(this.scene);
     this.player = new Player(this.scene);
     this.platforms = [];
+    this.coinRewards = [];
 
     this.isPlaying = false;
+    this.isPaused = false;
     this.score = 0;
+    this.isTestRun = false;
+    this.testStartJumpCount = 0;
     this.background.setTheme(0);
     this.platformSpacing = 4;
     this.platformsAhead = 9;
+    this.lastLandedPlatformZ = 0;
 
     // Register with engine update loop
     this.engine.addUpdatable(this);
@@ -28,24 +34,38 @@ export class GameLoop {
     if (this.onCreditsEarned) this.onCreditsEarned(amount);
   }
 
-  start() {
+  start(startingJumps = 0, testRun = false) {
     this.isPlaying = true;
-    this.score = 0;
-    this.background.setTheme(0);
-    this.scoreManager.updateScore(0);
+    this.isPaused = false;
+    this.isTestRun = testRun;
+    this.testStartJumpCount = startingJumps;
+    this.score = startingJumps * 10;
+    this.background.setTheme(Math.floor(this.score / 750));
+    this.background.prepareWorld(Math.floor(this.score / 750) + 1);
+    this.scoreManager.updateScore(this.score, !testRun);
+
+    const startZ = -startingJumps * this.platformSpacing;
+    this.lastLandedPlatformZ = startZ;
+    this.engine.camera.position.set(0, 10, startZ + 15);
+    this.engine.camera.lookAt(0, 2, startZ);
 
     // Clear existing platforms
     this.clearPlatforms();
 
     // Spawn initial platforms
-    this.spawnInitialPlatforms();
+    this.spawnInitialPlatforms(startZ);
 
     // Reset player position on starting platform
-    this.player.reset(new THREE.Vector3(0, 2, 0));
+    this.player.reset(new THREE.Vector3(0, 2, startZ));
+  }
+
+  startTestAtJumpCount(jumpCount) {
+    const startingJumps = THREE.MathUtils.clamp(Math.floor(jumpCount), 0, 10000);
+    this.start(startingJumps, true);
   }
 
   restart() {
-    this.start();
+    this.start(this.isTestRun ? this.testStartJumpCount : 0, this.isTestRun);
   }
 
   clearPlatforms() {
@@ -53,16 +73,18 @@ export class GameLoop {
       p.destroy();
     }
     this.platforms = [];
+    for (const reward of this.coinRewards) reward.destroy();
+    this.coinRewards = [];
   }
 
-  spawnInitialPlatforms() {
+  spawnInitialPlatforms(startZ = 0) {
     // Starting platform
-    const startPlatform = new Platform(this.scene, new THREE.Vector3(0, 0, 0), { width: 4, height: 0.4, depth: 4 });
+    const startPlatform = new Platform(this.scene, new THREE.Vector3(0, 0, startZ), { width: 4, height: 0.4, depth: 4 });
     this.platforms.push(startPlatform);
 
     // Spawn subsequent floating platforms
     for (let i = 1; i <= this.platformsAhead; i++) {
-      this.spawnPlatform(i * -this.platformSpacing);
+      this.spawnPlatform(startZ - i * this.platformSpacing);
     }
   }
 
@@ -75,6 +97,15 @@ export class GameLoop {
 
   update(delta) {
     this.background.update(delta, this.engine.camera);
+    if (this.isPaused) return;
+
+    for (const platform of this.platforms) platform.update(delta);
+    this.coinRewards = this.coinRewards.filter(reward => {
+      reward.update(delta);
+      if (reward.life > 0) return true;
+      reward.destroy();
+      return false;
+    });
     if (!this.isPlaying) return;
 
     // Update player and check platform collisions
@@ -86,11 +117,29 @@ export class GameLoop {
         // Game Over! Stepped on an already touched/disabled platform!
         this.gameOver();
       } else {
-        this.audio.playJump();
+        const tilesAdvanced = Math.max(1, Math.round(
+          (this.lastLandedPlatformZ - touchedPlatform.position.z) / this.platformSpacing
+        ));
+        const skippedTiles = Math.max(0, tilesAdvanced - 1);
+        this.lastLandedPlatformZ = touchedPlatform.position.z;
+
+        if (skippedTiles > 0) this.audio.playSkip();
+        else this.audio.playJump();
         this.score += 10;
-        this.scoreManager.updateScore(this.score);
-        this.awardCredits(10);
+        this.scoreManager.updateScore(this.score, !this.isTestRun);
+        const coinAmount = 1 + skippedTiles * 3;
+        this.awardCredits(coinAmount);
+        this.coinRewards.push(new CoinReward(
+          this.scene,
+          touchedPlatform.position.clone().add(new THREE.Vector3(0, 0.7, 0)),
+          coinAmount,
+          skippedTiles > 0
+        ));
         this.background.setTheme(Math.floor(this.score / 750));
+        const jumpsIntoWorld = Math.floor(this.score / 10) % 75;
+        if (jumpsIntoWorld >= 60) {
+          this.background.prepareWorld(Math.floor(this.score / 750) + 1);
+        }
 
         this.maintainPlatformRunway();
       }
@@ -142,7 +191,7 @@ export class GameLoop {
   gameOver() {
     this.isPlaying = false;
     this.audio.playGameOver();
-    this.scoreManager.saveBestScore(this.score);
+    if (!this.isTestRun) this.scoreManager.saveBestScore(this.score);
 
     window.dispatchEvent(new CustomEvent('game-over', {
       detail: { score: this.score }
