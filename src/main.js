@@ -35,6 +35,7 @@ class App {
     const shopScreen = document.getElementById('shop-screen');
     const shopOpenBtn = document.getElementById('shop-open-btn');
     const shopCloseBtn = document.getElementById('shop-close-btn');
+    const musicToggle = document.getElementById('music-toggle');
 
     startBtn.addEventListener('click', () => {
       mainMenu.classList.add('hidden');
@@ -49,6 +50,8 @@ class App {
 
     shopOpenBtn.addEventListener('click', () => shopScreen.classList.remove('hidden'));
     shopCloseBtn.addEventListener('click', () => shopScreen.classList.add('hidden'));
+    musicToggle.addEventListener('click', () => AudioManager.toggleMusic());
+    AudioManager.updateMusicButton();
 
     // Listen for game over events
     window.addEventListener('game-over', (e) => {

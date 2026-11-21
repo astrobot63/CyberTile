@@ -1,6 +1,6 @@
-# Don't Touch the Same
+# CyberTile
 
-A neon 3D arcade survival game built with Three.js and Vite.
+A calming, neon 3D arcade survival game built with Three.js and Vite. Jump over cities, earn credits, and unlock new ball colors.
 
 ## Run locally
 
