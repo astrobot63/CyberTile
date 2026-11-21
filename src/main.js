@@ -38,6 +38,7 @@ class App {
     const shopScreen = document.getElementById('shop-screen');
     const shopOpenBtn = document.getElementById('shop-open-btn');
     const shopCloseBtn = document.getElementById('shop-close-btn');
+    const shopBalance = document.getElementById('shop-balance');
     const musicToggle = document.getElementById('music-toggle');
     const settingsScreen = document.getElementById('settings-screen');
     const settingsOpenBtn = document.getElementById('settings-open-btn');
@@ -101,8 +102,16 @@ class App {
       this.gameLoop.restart();
     });
 
-    shopOpenBtn.addEventListener('click', () => openPanel(shopScreen, 'shop'));
-    shopCloseBtn.addEventListener('click', () => closePanel(shopScreen));
+    shopOpenBtn.addEventListener('click', () => {
+      openPanel(shopScreen, 'shop');
+      shopCloseBtn.style.display = 'block';
+      shopBalance.style.display = 'block';
+    });
+    shopCloseBtn.addEventListener('click', () => {
+      closePanel(shopScreen);
+      shopCloseBtn.style.display = 'none';
+      shopBalance.style.display = 'none';
+    });
     musicToggle.addEventListener('click', () => AudioManager.toggleMusic());
     settingsOpenBtn.addEventListener('click', () => openPanel(settingsScreen, 'settings'));
     settingsCloseBtn.addEventListener('click', () => closePanel(settingsScreen));
