@@ -67,8 +67,7 @@ export class ShopManager {
     return true;
   }
 
-  static activateForRun(gameLoop, testRun = false) {
-    if (testRun) return {};
+  static activateForRun() {
     const active = {};
     for (const powerup of POWERUPS) {
       if ((this.powerupInventory[powerup.id] || 0) < 1) continue;
@@ -76,7 +75,6 @@ export class ShopManager {
       active[powerup.id] = powerup.id === 'shield' ? true : powerup.id === 'coinMagnet' ? 25 : 20;
     }
     localStorage.setItem('dtts_powerups', JSON.stringify(this.powerupInventory));
-    this.activeRun = gameLoop;
     this.render();
     return active;
   }

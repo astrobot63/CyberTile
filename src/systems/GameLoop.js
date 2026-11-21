@@ -19,8 +19,6 @@ export class GameLoop {
     this.isPlaying = false;
     this.isPaused = false;
     this.score = 0;
-    this.isTestRun = false;
-    this.testStartJumpCount = 0;
     this.background.setTheme(0);
     this.platformSpacing = 4;
     this.platformsAhead = 9;
@@ -35,17 +33,15 @@ export class GameLoop {
     if (this.onCreditsEarned) this.onCreditsEarned(amount);
   }
 
-  start(startingJumps = 0, testRun = false) {
+  start() {
     this.isPlaying = true;
     this.isPaused = false;
-    this.isTestRun = testRun;
-    this.testStartJumpCount = startingJumps;
-    this.score = startingJumps * 10;
+    this.score = 0;
     this.background.setTheme(Math.floor(this.score / 750));
     this.background.prepareWorld(Math.floor(this.score / 750) + 1);
-    this.scoreManager.updateScore(this.score, !testRun);
+    this.scoreManager.updateScore(this.score);
 
-    const startZ = -startingJumps * this.platformSpacing;
+    const startZ = 0;
     this.lastLandedPlatformZ = startZ;
     this.engine.camera.position.set(0, 10, startZ + 15);
     this.engine.camera.lookAt(0, 2, startZ);
@@ -58,16 +54,11 @@ export class GameLoop {
 
     // Reset player position on starting platform
     this.player.reset(new THREE.Vector3(0, 2, startZ));
-    this.powerUps = this.onRunStart ? this.onRunStart(testRun) : {};
-  }
-
-  startTestAtJumpCount(jumpCount) {
-    const startingJumps = THREE.MathUtils.clamp(Math.floor(jumpCount), 0, 10000);
-    this.start(startingJumps, true);
+    this.powerUps = this.onRunStart ? this.onRunStart(false) : {};
   }
 
   restart() {
-    this.start(this.isTestRun ? this.testStartJumpCount : 0, this.isTestRun);
+    this.start();
   }
 
   clearPlatforms() {
@@ -130,7 +121,7 @@ export class GameLoop {
         const scoreGain = this.powerUps.scoreBoost > 0 ? 20 : 10;
         if (this.powerUps.scoreBoost > 0) this.powerUps.scoreBoost--;
         this.score += scoreGain;
-        this.scoreManager.updateScore(this.score, !this.isTestRun);
+        this.scoreManager.updateScore(this.score);
         let coinAmount = 1 + skippedTiles * 3;
         if (this.powerUps.coinMagnet > 0) {
           coinAmount += 2;
@@ -222,7 +213,7 @@ export class GameLoop {
   gameOver() {
     this.isPlaying = false;
     this.audio.playGameOver();
-    if (!this.isTestRun) this.scoreManager.saveBestScore(this.score);
+    this.scoreManager.saveBestScore(this.score);
 
     window.dispatchEvent(new CustomEvent('game-over', {
       detail: { score: this.score }

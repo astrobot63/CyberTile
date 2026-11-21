@@ -22,7 +22,7 @@ class App {
     });
     ShopManager.init(this.gameLoop.player);
     this.gameLoop.onCreditsEarned = amount => ShopManager.earn(amount);
-    this.gameLoop.onRunStart = testRun => ShopManager.activateForRun(this.gameLoop, testRun);
+    this.gameLoop.onRunStart = () => ShopManager.activateForRun();
 
     this.setupUI();
     this.engine.start();
@@ -32,8 +32,6 @@ class App {
     const mainMenu = document.getElementById('main-menu');
     const gameOverScreen = document.getElementById('game-over-screen');
     const startBtn = document.getElementById('start-btn');
-    const testStartBtn = document.getElementById('test-start-btn');
-    const testJumpCount = document.getElementById('test-jump-count');
     const restartBtn = document.getElementById('restart-btn');
     const shopScreen = document.getElementById('shop-screen');
     const shopOpenBtn = document.getElementById('shop-open-btn');
@@ -82,18 +80,6 @@ class App {
       setGameButtonsVisible(false);
       AudioManager.startMusic();
       this.gameLoop.start();
-    });
-
-    testStartBtn.addEventListener('click', () => {
-      const jumpCount = Number.parseInt(testJumpCount.value, 10);
-      if (!Number.isFinite(jumpCount)) {
-        testJumpCount.focus();
-        return;
-      }
-      mainMenu.classList.add('hidden');
-      setGameButtonsVisible(false);
-      AudioManager.startMusic();
-      this.gameLoop.startTestAtJumpCount(jumpCount);
     });
 
     restartBtn.addEventListener('click', () => {
