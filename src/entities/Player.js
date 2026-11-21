@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { Input } from '../core/Input.js';
 
 export class Player {
   constructor(scene) {
@@ -13,6 +12,7 @@ export class Player {
     this.isGrounded = false;
     this.radius = 0.5;
     this.material = null;
+    this.trail = null;
 
     this.createMesh();
   }
@@ -30,6 +30,43 @@ export class Player {
     this.mesh = new THREE.Mesh(geometry, this.material);
     this.mesh.castShadow = true;
     this.scene.add(this.mesh);
+    this.createTrail();
+  }
+
+  createTrail() {
+    const count = 16;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    this.trailPositions = Array.from({ length: count }, () => this.position.clone());
+    this.trailGeometry = new THREE.BufferGeometry();
+    this.trailGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    this.trailGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    this.trailMaterial = new THREE.PointsMaterial({
+      size: 0.38,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+    this.trail = new THREE.Points(this.trailGeometry, this.trailMaterial);
+    this.trail.frustumCulled = false;
+    this.scene.add(this.trail);
+    this.setTrail('#00ffff');
+    this.updateTrail(0);
+  }
+
+  updateTrail(delta) {
+    if (delta > 0) {
+      this.trailPositions.unshift(this.position.clone());
+      this.trailPositions.pop();
+    } else {
+      this.trailPositions.fill(this.position.clone());
+    }
+    const positions = this.trailGeometry.attributes.position;
+    this.trailPositions.forEach((point, i) => positions.setXYZ(i, point.x, point.y, point.z));
+    positions.needsUpdate = true;
   }
 
   setSkin(color) {
@@ -37,44 +74,34 @@ export class Player {
     this.material.emissive.set(color);
   }
 
+  setTrail(color) {
+    this.trailColor = color;
+    if (!this.trailGeometry) return;
+    const colors = this.trailGeometry.attributes.color;
+    const baseColor = new THREE.Color(color);
+    for (let i = 0; i < colors.count; i++) {
+      const fade = 1 - i / colors.count;
+      colors.setXYZ(i, baseColor.r * fade, baseColor.g * fade, baseColor.b * fade);
+    }
+    colors.needsUpdate = true;
+  }
+
   reset(pos = new THREE.Vector3(0, 2, 0)) {
     this.position.copy(pos);
     this.velocity.set(0, 0, 0);
     this.isGrounded = false;
     this.mesh.position.copy(this.position);
+    this.updateTrail(0);
   }
 
-  update(delta, platforms) {
-    // Handle input direction
+  update(delta, platforms, targetLaneX = 0, targetRowZ = this.position.z - 4) {
     const moveDir = new THREE.Vector3(0, 0, 0);
-    if (Input.isPressed('KeyW') || Input.isPressed('ArrowUp')) moveDir.z -= 1;
-    if (Input.isPressed('KeyS') || Input.isPressed('ArrowDown')) moveDir.z += 1;
-    if (Input.isPressed('KeyA') || Input.isPressed('ArrowLeft')) moveDir.x -= 1;
-    if (Input.isPressed('KeyD') || Input.isPressed('ArrowRight')) moveDir.x += 1;
-    const touchMovement = Input.getTouchMovement();
-    if (Input.autoForward) {
-      const nextPlatform = platforms
-        .filter(platform => !platform.isTouched && platform.position.z < this.position.z - 1)
-        .sort((a, b) => b.position.z - a.position.z)[0];
-
-      if (nextPlatform) {
-        const dx = nextPlatform.position.x - this.position.x;
-        const dz = nextPlatform.position.z - this.position.z;
-        const safeX = Math.max(0, nextPlatform.size.width / 2 - this.radius);
-        const safeZ = Math.max(0, nextPlatform.size.depth / 2 - this.radius);
-        moveDir.x = Math.abs(dx) > safeX ? Math.sign(dx) : 0;
-        moveDir.z = Math.abs(dz) > safeZ ? Math.sign(dz) : 0;
-      } else {
-        moveDir.z = -1;
-      }
-
-      // Side-to-side dragging still steers the ball while it advances safely.
-      if (Math.abs(touchMovement.x) > 0.04) moveDir.x = touchMovement.x;
-      if (Math.abs(touchMovement.z) > 0.04) moveDir.z = touchMovement.z;
-    } else {
-      moveDir.x += touchMovement.x;
-      moveDir.z += touchMovement.z;
-    }
+    const dx = targetLaneX - this.position.x;
+    const dz = targetRowZ - this.position.z;
+    const safeX = 0.04;
+    const safeZ = 0.04;
+    moveDir.x = Math.abs(dx) > safeX ? Math.sign(dx) : 0;
+    moveDir.z = Math.abs(dz) > safeZ ? Math.sign(dz) : 0;
 
     moveDir.normalize();
 
@@ -89,6 +116,8 @@ export class Player {
     this.position.x += this.velocity.x * delta;
     this.position.y += this.velocity.y * delta;
     this.position.z += this.velocity.z * delta;
+    this.mesh.position.copy(this.position);
+    this.updateTrail(delta);
 
     // Platform Collision Detection
     this.isGrounded = false;
@@ -109,7 +138,6 @@ export class Player {
       }
     }
 
-    this.mesh.position.copy(this.position);
     return null;
   }
 }

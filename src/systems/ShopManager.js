@@ -14,6 +14,15 @@ const POWERUPS = [
   { id: 'scoreBoost', name: 'SCORE BOOST', icon: '⚡', color: '#a6ff00', price: 300, description: 'Doubles score from your first 20 landings.' }
 ];
 
+const TRAILS = [
+  { id: 'cyan', name: 'CYAN STREAM', color: '#00ffff', price: 0 },
+  { id: 'magenta', name: 'PINK COMET', color: '#ff20bd', price: 120 },
+  { id: 'gold', name: 'SOLAR DUST', color: '#ffbd55', price: 250 },
+  { id: 'lime', name: 'ION WAKE', color: '#a6ff00', price: 400 },
+  { id: 'violet', name: 'VOID TRACE', color: '#9b5cff', price: 600 },
+  { id: 'ice', name: 'ICE PARTICLES', color: '#91f5ff', price: 800 }
+];
+
 export class ShopManager {
   static init(player) {
     this.player = player;
@@ -21,6 +30,9 @@ export class ShopManager {
     this.owned = this.loadOwnedSkins();
     const savedSelection = localStorage.getItem('dtts_selected_skin') || 'cyan';
     this.selected = this.owned.includes(savedSelection) ? savedSelection : 'cyan';
+    this.ownedTrails = this.loadOwnedTrails();
+    const savedTrail = localStorage.getItem('dtts_selected_trail') || 'cyan';
+    this.selectedTrail = this.ownedTrails.includes(savedTrail) ? savedTrail : 'cyan';
     this.powerupInventory = this.loadPowerups();
     if (!this.owned.includes('cyan')) this.owned.push('cyan');
     this.applySelected();
@@ -38,10 +50,14 @@ export class ShopManager {
     this.owned = ['cyan'];
     this.selected = 'cyan';
     this.powerupInventory = {};
+    this.ownedTrails = ['cyan'];
+    this.selectedTrail = 'cyan';
     localStorage.removeItem('dtts_credits');
     localStorage.removeItem('dtts_owned_skins');
     localStorage.removeItem('dtts_selected_skin');
     localStorage.removeItem('dtts_powerups');
+    localStorage.removeItem('dtts_owned_trails');
+    localStorage.removeItem('dtts_selected_trail');
     this.applySelected();
     this.render();
   }
@@ -60,6 +76,17 @@ export class ShopManager {
       const saved = JSON.parse(localStorage.getItem('dtts_owned_skins') || '["cyan"]');
       if (!Array.isArray(saved)) return ['cyan'];
       const validIds = new Set(SHOP_ITEMS.map(item => item.id));
+      return [...new Set(['cyan', ...saved.filter(id => validIds.has(id))])];
+    } catch (error) {
+      return ['cyan'];
+    }
+  }
+
+  static loadOwnedTrails() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('dtts_owned_trails') || '["cyan"]');
+      if (!Array.isArray(saved)) return ['cyan'];
+      const validIds = new Set(TRAILS.map(item => item.id));
       return [...new Set(['cyan', ...saved.filter(id => validIds.has(id))])];
     } catch (error) {
       return ['cyan'];
@@ -117,13 +144,39 @@ export class ShopManager {
   static applySelected() {
     const item = SHOP_ITEMS.find(entry => entry.id === this.selected) || SHOP_ITEMS[0];
     this.player.setSkin(item.color);
+    const trail = TRAILS.find(entry => entry.id === this.selectedTrail) || TRAILS[0];
+    this.player.setTrail(trail.color);
+  }
+
+  static buyOrSelectTrail(id) {
+    const item = TRAILS.find(entry => entry.id === id);
+    if (!item) return 'unavailable';
+    let result;
+    if (this.ownedTrails.includes(id)) {
+      this.selectedTrail = id;
+      result = 'equipped';
+    } else if (this.credits >= item.price) {
+      this.credits -= item.price;
+      this.ownedTrails.push(id);
+      this.selectedTrail = id;
+      localStorage.setItem('dtts_credits', String(this.credits));
+      localStorage.setItem('dtts_owned_trails', JSON.stringify(this.ownedTrails));
+      result = 'purchased';
+    } else {
+      return 'insufficient';
+    }
+    localStorage.setItem('dtts_selected_trail', this.selectedTrail);
+    this.applySelected();
+    this.render();
+    return result;
   }
 
   static render() {
     const balance = document.getElementById('credits-val');
     const skinContainer = document.getElementById('shop-skins');
+    const trailContainer = document.getElementById('shop-trails');
     const powerupContainer = document.getElementById('shop-powerups');
-    if (!balance || !skinContainer || !powerupContainer) return;
+    if (!balance || !skinContainer || !trailContainer || !powerupContainer) return;
     balance.textContent = this.credits;
     const hudCoins = document.getElementById('coins-val');
     if (hudCoins) hudCoins.textContent = this.credits;
@@ -148,6 +201,28 @@ export class ShopManager {
         }
         else if (result === 'purchased') this.showNotice('Skin purchased and equipped.', 'success');
         else if (result === 'equipped') this.showNotice('Skin equipped.', 'success');
+      });
+    });
+
+    trailContainer.innerHTML = TRAILS.map(item => {
+      const owned = this.ownedTrails.includes(item.id);
+      const selected = this.selectedTrail === item.id;
+      const label = selected ? 'EQUIPPED' : owned ? 'EQUIP' : `${item.price} COINS`;
+      return `<article class="shop-item">
+        <div class="trail-preview" style="--trail-color:${item.color}"><i></i><i></i><i></i><i></i></div>
+        <h2>${item.name}</h2>
+        <p>${owned ? 'Player trail' : `Unlock for ${item.price} coins`}</p>
+        <button class="btn" data-trail="${item.id}" ${selected ? 'disabled' : ''}>${label}</button>
+      </article>`;
+    }).join('');
+    trailContainer.querySelectorAll('[data-trail]').forEach(button => {
+      button.addEventListener('click', () => {
+        const result = this.buyOrSelectTrail(button.dataset.trail);
+        if (result === 'insufficient') {
+          const item = TRAILS.find(entry => entry.id === button.dataset.trail);
+          this.showNotice(`Not enough coins. ${item.price} needed; you have ${this.credits}.`, 'error');
+        } else if (result === 'purchased') this.showNotice('Trail purchased and equipped.', 'success');
+        else if (result === 'equipped') this.showNotice('Trail equipped.', 'success');
       });
     });
 

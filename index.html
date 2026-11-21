@@ -150,6 +150,11 @@
     .shop-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; width: min(760px, 92vw); padding: 5px; }
     .shop-item { background: rgba(12,20,42,.92); border: 1px solid rgba(0,255,255,.32); border-radius: 14px; padding: 16px 12px; text-align: center; }
     .skin-preview { width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 10px; box-shadow: 0 0 22px currentColor; }
+    .trail-preview { height: 48px; display: flex; align-items: center; justify-content: center; gap: 3px; margin: 0 auto 10px; }
+    .trail-preview i { width: 9px; height: 9px; border-radius: 50%; background: var(--trail-color); box-shadow: 0 0 14px var(--trail-color); opacity: .45; }
+    .trail-preview i:nth-child(2) { width: 12px; height: 12px; opacity: .65; }
+    .trail-preview i:nth-child(3) { width: 16px; height: 16px; opacity: .82; }
+    .trail-preview i:nth-child(4) { width: 21px; height: 21px; opacity: 1; }
     .shop-item h2 { font-size: .95rem; color: #fff; margin-bottom: 7px; }
     .shop-item p { font-size: .78rem; color: #a0a0c0; margin-bottom: 10px; }
     .powerup-icon { font-size: 2rem; margin: 0 auto 8px; filter: drop-shadow(0 0 10px currentColor); }
@@ -235,6 +240,8 @@
     <h1>NEON SHOP</h1>
     <h2 class="shop-section-title">BALL SKINS</h2>
     <div id="shop-skins" class="shop-items"></div>
+    <h2 class="shop-section-title">PLAYER TRAILS</h2>
+    <div id="shop-trails" class="shop-items"></div>
     <h2 class="shop-section-title">POWERUPS · ACTIVATE NEXT RUN</h2>
     <div id="shop-powerups" class="shop-items"></div>
   </div>
@@ -276,7 +283,7 @@
 
   <div id="reset-confirm-screen" class="screen confirm-screen hidden interactive" role="alertdialog" aria-modal="true" aria-labelledby="reset-confirm-title">
     <h1 id="reset-confirm-title">RESET PROGRESS?</h1>
-    <p class="subtitle">All coins, skins, and scores will be deleted.</p>
+    <p class="subtitle">All coins, skins, trails, powerups, and scores will be deleted.</p>
     <div class="confirm-actions">
       <button id="reset-cancel-btn" class="btn" type="button">CANCEL</button>
       <button id="reset-confirm-btn" class="btn danger-btn" type="button">YES, RESET</button>

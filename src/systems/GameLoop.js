@@ -3,6 +3,7 @@ import { Player } from '../entities/Player.js';
 import { Platform } from '../entities/Platform.js';
 import { CyberBackground } from '../effects/CyberBackground.js';
 import { CoinReward } from '../effects/CoinReward.js';
+import { Input } from '../core/Input.js';
 
 export class GameLoop {
   constructor({ engine, audio, score }) {
@@ -23,6 +24,12 @@ export class GameLoop {
     this.background.setTheme(0);
     this.platformSpacing = 4;
     this.platformsAhead = 9;
+    this.lanePositions = [-4.5, 0, 4.5];
+    this.currentLaneIndex = 1;
+    this.safeLaneIndex = 1;
+    this.targetLaneIndex = 1;
+    this.targetRowZ = -this.platformSpacing;
+    this.manualLaneChoice = false;
     this.lastLandedPlatformZ = 0;
     this.powerUps = {};
 
@@ -45,6 +52,12 @@ export class GameLoop {
 
     const startZ = 0;
     this.lastLandedPlatformZ = startZ;
+    this.currentLaneIndex = 1;
+    this.safeLaneIndex = 1;
+    this.targetLaneIndex = 1;
+    this.targetRowZ = startZ;
+    this.manualLaneChoice = false;
+    Input.clear();
     this.engine.camera.position.set(0, 10, startZ + 15);
     this.engine.camera.lookAt(0, 2, startZ);
 
@@ -73,21 +86,44 @@ export class GameLoop {
   }
 
   spawnInitialPlatforms(startZ = 0) {
-    // Starting platform
-    const startPlatform = new Platform(this.scene, new THREE.Vector3(0, 0, startZ), { width: 4, height: 0.4, depth: 4 });
+    const startPlatform = new Platform(this.scene, new THREE.Vector3(this.lanePositions[1], 0, startZ), { width: 3, height: 0.4, depth: 3 });
+    startPlatform.laneIndex = 1;
     this.platforms.push(startPlatform);
 
-    // Spawn subsequent floating platforms
     for (let i = 1; i <= this.platformsAhead; i++) {
-      this.spawnPlatform(startZ - i * this.platformSpacing);
+      this.spawnPlatformRow(startZ - i * this.platformSpacing);
     }
   }
 
-  spawnPlatform(zPos) {
-    const xPos = (Math.random() - 0.5) * 8;
+  spawnPlatform(zPos, laneIndex) {
+    const xPos = this.lanePositions[laneIndex];
     const yPos = Math.sin(Math.abs(zPos) * 0.2) * 2;
     const platform = new Platform(this.scene, new THREE.Vector3(xPos, yPos, zPos), { width: 3, height: 0.4, depth: 3 });
+    platform.laneIndex = laneIndex;
     this.platforms.push(platform);
+  }
+
+  spawnPlatformRow(zPos) {
+    const unsafeLanes = this.lanePositions.map((_, index) => index).filter(index => index !== this.safeLaneIndex);
+    const missingLane = unsafeLanes[Math.floor(Math.random() * unsafeLanes.length)];
+    for (let laneIndex = 0; laneIndex < this.lanePositions.length; laneIndex++) {
+      if (laneIndex !== missingLane) this.spawnPlatform(zPos, laneIndex);
+    }
+  }
+
+  ensureSafeLaneAhead(laneIndex, fromZ) {
+    this.safeLaneIndex = laneIndex;
+    const futureRows = [...new Set(
+      this.platforms
+        .filter(platform => platform.position.z < fromZ - 1)
+        .map(platform => platform.position.z)
+    )];
+    for (const zPos of futureRows) {
+      const hasSafeTile = this.platforms.some(
+        platform => platform.laneIndex === laneIndex && Math.abs(platform.position.z - zPos) < 0.01
+      );
+      if (!hasSafeTile) this.spawnPlatform(zPos, laneIndex);
+    }
   }
 
   update(delta) {
@@ -103,8 +139,29 @@ export class GameLoop {
     });
     if (!this.isPlaying) return;
 
-    // Update player and check platform collisions
-    const touchedPlatform = this.player.update(delta, this.platforms);
+    const laneChange = Input.consumeLaneChange();
+    if (laneChange) {
+      const baseLane = this.manualLaneChoice || this.targetLaneIndex !== this.currentLaneIndex
+        ? this.targetLaneIndex
+        : this.currentLaneIndex;
+      const nextLane = THREE.MathUtils.clamp(
+        baseLane + laneChange,
+        0,
+        this.lanePositions.length - 1
+      );
+      if (nextLane !== baseLane) {
+        this.manualLaneChoice = true;
+        this.targetLaneIndex = nextLane;
+      }
+    }
+
+    // Advance automatically; taps and key presses select the next lane.
+    const touchedPlatform = this.player.update(
+      delta,
+      this.platforms,
+      this.lanePositions[this.targetLaneIndex],
+      this.targetRowZ
+    );
 
     if (touchedPlatform) {
       const success = touchedPlatform.touch();
@@ -112,6 +169,11 @@ export class GameLoop {
         // Game Over! Stepped on an already touched/disabled platform!
         this.gameOver();
       } else {
+        this.currentLaneIndex = touchedPlatform.laneIndex;
+        if (!this.manualLaneChoice) this.targetLaneIndex = touchedPlatform.laneIndex;
+        this.manualLaneChoice = false;
+        this.targetRowZ = touchedPlatform.position.z - this.platformSpacing;
+        this.ensureSafeLaneAhead(touchedPlatform.laneIndex, touchedPlatform.position.z);
         const tilesAdvanced = Math.max(1, Math.round(
           (this.lastLandedPlatformZ - touchedPlatform.position.z) / this.platformSpacing
         ));
@@ -180,6 +242,12 @@ export class GameLoop {
       platform.position.z
     );
     this.player.velocity.set(0, 0, 0);
+    this.currentLaneIndex = platform.laneIndex;
+    this.safeLaneIndex = platform.laneIndex;
+    this.targetLaneIndex = platform.laneIndex;
+    this.targetRowZ = platform.position.z - this.platformSpacing;
+    this.manualLaneChoice = false;
+    this.ensureSafeLaneAhead(platform.laneIndex, platform.position.z);
     this.player.mesh.position.copy(this.player.position);
     this.lastLandedPlatformZ = Math.max(this.lastLandedPlatformZ, platform.position.z);
     return true;
@@ -198,18 +266,14 @@ export class GameLoop {
 
     // Keep a fixed number of tiles ahead of the player's progress. Starting
     // from the player's position also handles large jumps over several tiles.
-    const furthestZ = this.platforms.length
+    const requiredFurthestZ = this.player.position.z - this.platformSpacing * this.platformsAhead;
+    let furthestZ = this.platforms.length
       ? Math.min(...this.platforms.map(platform => platform.position.z))
       : this.player.position.z;
-    const requiredFurthestZ = this.player.position.z - this.platformSpacing * this.platformsAhead;
-    const targetFurthestZ = Math.min(furthestZ, requiredFurthestZ);
 
-    while (this.platforms.length < this.platformsAhead + 1 ||
-           Math.min(...this.platforms.map(platform => platform.position.z)) > requiredFurthestZ) {
-      const nextZ = this.platforms.length
-        ? Math.min(...this.platforms.map(platform => platform.position.z)) - this.platformSpacing
-        : targetFurthestZ;
-      this.spawnPlatform(nextZ);
+    while (furthestZ > requiredFurthestZ) {
+      furthestZ -= this.platformSpacing;
+      this.spawnPlatformRow(furthestZ);
     }
   }
 
