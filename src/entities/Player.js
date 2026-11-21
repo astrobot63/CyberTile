@@ -51,6 +51,30 @@ export class Player {
     if (Input.isPressed('KeyS') || Input.isPressed('ArrowDown')) moveDir.z += 1;
     if (Input.isPressed('KeyA') || Input.isPressed('ArrowLeft')) moveDir.x -= 1;
     if (Input.isPressed('KeyD') || Input.isPressed('ArrowRight')) moveDir.x += 1;
+    const touchMovement = Input.getTouchMovement();
+    if (Input.autoForward) {
+      const nextPlatform = platforms
+        .filter(platform => !platform.isTouched && platform.position.z < this.position.z - 1)
+        .sort((a, b) => b.position.z - a.position.z)[0];
+
+      if (nextPlatform) {
+        const dx = nextPlatform.position.x - this.position.x;
+        const dz = nextPlatform.position.z - this.position.z;
+        const safeX = Math.max(0, nextPlatform.size.width / 2 - this.radius);
+        const safeZ = Math.max(0, nextPlatform.size.depth / 2 - this.radius);
+        moveDir.x = Math.abs(dx) > safeX ? Math.sign(dx) : 0;
+        moveDir.z = Math.abs(dz) > safeZ ? Math.sign(dz) : 0;
+      } else {
+        moveDir.z = -1;
+      }
+
+      // Side-to-side dragging still steers the ball while it advances safely.
+      if (Math.abs(touchMovement.x) > 0.04) moveDir.x = touchMovement.x;
+      if (Math.abs(touchMovement.z) > 0.04) moveDir.z = touchMovement.z;
+    } else {
+      moveDir.x += touchMovement.x;
+      moveDir.z += touchMovement.z;
+    }
 
     moveDir.normalize();
 
