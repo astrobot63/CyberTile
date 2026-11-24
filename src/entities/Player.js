@@ -39,6 +39,8 @@ export class Player {
   createTrail() {
     this.trailPointCount = 24;
     this.trailRebuildTimer = 0;
+    this.trailSampleSpacing = 0.24;
+    this.trailSampleCarry = 0;
     this.trailPositions = Array.from({ length: this.trailPointCount }, (_, i) =>
       this.position.clone().add(new THREE.Vector3(0, 0, i * 0.08))
     );
@@ -59,18 +61,31 @@ export class Player {
   }
 
   updateTrail(delta) {
-    if (delta > 0) {
-      this.trailRebuildTimer += delta;
-      if (this.trailRebuildTimer < 1 / 30) return;
-      this.trailRebuildTimer = 0;
-    }
-    if (delta > 0 && this.position.distanceToSquared(this.trailPositions[0]) > 0.0125) {
-      this.trailPositions.unshift(this.position.clone());
-      this.trailPositions.pop();
-    } else if (delta === 0) {
+    if (delta === 0) {
+      this.trailSampleCarry = 0;
       this.trailPositions = Array.from({ length: this.trailPointCount }, (_, i) =>
         this.position.clone().add(new THREE.Vector3(0, 0, i * 0.08))
       );
+    } else {
+      this.trailSampleCarry += this.trailPositions[0].distanceTo(this.position);
+      if (this.trailSampleCarry >= this.trailSampleSpacing) {
+        const sampleCount = Math.min(
+          this.trailPointCount,
+          Math.floor(this.trailSampleCarry / this.trailSampleSpacing)
+        );
+        const movement = this.position.clone().sub(this.trailPositions[0]);
+        const movementLength = movement.length();
+        const coveredDistance = Math.min(this.trailSampleCarry, movementLength);
+        const direction = movement.lengthSq() > 0 ? movement.normalize() : new THREE.Vector3(0, 0, -1);
+        for (let i = 0; i < sampleCount; i++) {
+          this.trailPositions.unshift(this.trailPositions[0].clone().addScaledVector(
+            direction,
+            Math.min(this.trailSampleSpacing, coveredDistance)
+          ));
+          this.trailPositions.pop();
+        }
+        this.trailSampleCarry %= this.trailSampleSpacing;
+      }
     }
     this.trailCurve.points = this.trailPositions;
     this.trailGeometry.dispose();
@@ -180,14 +195,14 @@ export class Player {
           this.isGrounded = true;
           this.autoAdvance = true;
           this.mesh.position.copy(this.position);
-          this.updateTrail(0);
+          this.updateTrail(delta);
           return null;
         }
         this.position.x = platform.position.x;
         this.position.z = platform.position.z;
         this.position.y = platform.position.y + platform.height / 2 + this.radius;
         this.mesh.position.copy(this.position);
-        this.updateTrail(0);
+        this.updateTrail(delta);
         this.velocity.y = this.jumpForce; // Automatic bounce/jump
         this.isGrounded = true;
         this.autoAdvance = true;
