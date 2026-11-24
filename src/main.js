@@ -11,7 +11,7 @@ const MUSIC_TRACKS = [
   ['Marshmello', 'Alone', 'ALZHF5UqnU4', 142],
   ['Imagine Dragons', 'Believer', '7wtfhZwyrcc', 125, 0, [{ atBeat: 34, duration: 1.92 }]],
   ['Dua Lipa', 'Levitating', 'N000qglmmY0', 103, 0],
-  ['Alan Walker', 'Faded', '60ItHLz5WEA', 90, 0.5],
+  ['Alan Walker', 'Faded', '60ItHLz5WEA', 90, 1.5],
   ['Avicii', 'Wake Me Up', 'IcrbM1l_BoI', 124],
   ['Swedish House Mafia', "Don't You Worry Child", '1y6smkh6c-0', 129],
   ['Daft Punk', 'One More Time', 'FGBhQbmPwH8', 123],

@@ -171,7 +171,6 @@ export class AudioManager {
             videoId: this.selectedTrack.videoId,
             startSeconds: this.selectedTrack.startAt
           });
-          this.onlineMusicPlayer.playVideo?.();
         } else {
           this.startWhenReady = true;
         }
