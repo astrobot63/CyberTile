@@ -45,6 +45,14 @@ export class ShopManager {
     this.render();
   }
 
+  static spendCredits(amount) {
+    if (!Number.isFinite(amount) || amount < 0 || this.credits < amount) return false;
+    this.credits -= amount;
+    localStorage.setItem('dtts_credits', String(this.credits));
+    this.render();
+    return true;
+  }
+
   static resetProgress() {
     this.credits = 0;
     this.owned = ['cyan'];
@@ -106,7 +114,8 @@ export class ShopManager {
     return true;
   }
 
-  static activateForRun() {
+  static activateForRun(testRun = false) {
+    if (testRun) return {};
     const active = {};
     for (const powerup of POWERUPS) {
       if ((this.powerupInventory[powerup.id] || 0) < 1) continue;

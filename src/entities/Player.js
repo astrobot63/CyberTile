@@ -13,6 +13,9 @@ export class Player {
     this.radius = 0.5;
     this.material = null;
     this.trail = null;
+    this.autoAdvance = false;
+    this.holdTile = null;
+    this.failedHoldTile = null;
 
     this.createMesh();
   }
@@ -34,23 +37,21 @@ export class Player {
   }
 
   createTrail() {
-    const count = 16;
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    this.trailPositions = Array.from({ length: count }, () => this.position.clone());
-    this.trailGeometry = new THREE.BufferGeometry();
-    this.trailGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    this.trailGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    this.trailMaterial = new THREE.PointsMaterial({
-      size: 0.38,
-      vertexColors: true,
+    this.trailPointCount = 24;
+    this.trailRebuildTimer = 0;
+    this.trailPositions = Array.from({ length: this.trailPointCount }, (_, i) =>
+      this.position.clone().add(new THREE.Vector3(0, 0, i * 0.08))
+    );
+    this.trailCurve = new THREE.CatmullRomCurve3(this.trailPositions);
+    this.trailGeometry = new THREE.TubeGeometry(this.trailCurve, 48, 0.2, 8, false);
+    this.trailMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.58,
       blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true
+      depthWrite: false
     });
-    this.trail = new THREE.Points(this.trailGeometry, this.trailMaterial);
+    this.trail = new THREE.Mesh(this.trailGeometry, this.trailMaterial);
     this.trail.frustumCulled = false;
     this.scene.add(this.trail);
     this.setTrail('#00ffff');
@@ -59,14 +60,22 @@ export class Player {
 
   updateTrail(delta) {
     if (delta > 0) {
+      this.trailRebuildTimer += delta;
+      if (this.trailRebuildTimer < 1 / 30) return;
+      this.trailRebuildTimer = 0;
+    }
+    if (delta > 0 && this.position.distanceToSquared(this.trailPositions[0]) > 0.0125) {
       this.trailPositions.unshift(this.position.clone());
       this.trailPositions.pop();
-    } else {
-      this.trailPositions.fill(this.position.clone());
+    } else if (delta === 0) {
+      this.trailPositions = Array.from({ length: this.trailPointCount }, (_, i) =>
+        this.position.clone().add(new THREE.Vector3(0, 0, i * 0.08))
+      );
     }
-    const positions = this.trailGeometry.attributes.position;
-    this.trailPositions.forEach((point, i) => positions.setXYZ(i, point.x, point.y, point.z));
-    positions.needsUpdate = true;
+    this.trailCurve.points = this.trailPositions;
+    this.trailGeometry.dispose();
+    this.trailGeometry = new THREE.TubeGeometry(this.trailCurve, 48, 0.2, 8, false);
+    this.trail.geometry = this.trailGeometry;
   }
 
   setSkin(color) {
@@ -76,38 +85,57 @@ export class Player {
 
   setTrail(color) {
     this.trailColor = color;
-    if (!this.trailGeometry) return;
-    const colors = this.trailGeometry.attributes.color;
-    const baseColor = new THREE.Color(color);
-    for (let i = 0; i < colors.count; i++) {
-      const fade = 1 - i / colors.count;
-      colors.setXYZ(i, baseColor.r * fade, baseColor.g * fade, baseColor.b * fade);
-    }
-    colors.needsUpdate = true;
+    if (this.trailMaterial) this.trailMaterial.color.set(color);
   }
 
   reset(pos = new THREE.Vector3(0, 2, 0)) {
     this.position.copy(pos);
     this.velocity.set(0, 0, 0);
     this.isGrounded = false;
+    this.autoAdvance = false;
+    this.holdTile = null;
+    this.failedHoldTile = null;
     this.mesh.position.copy(this.position);
     this.updateTrail(0);
   }
 
-  update(delta, platforms, targetLaneX = 0, targetRowZ = this.position.z - 4) {
-    const moveDir = new THREE.Vector3(0, 0, 0);
+  update(delta, platforms, targetLaneX = 0, holdActive = false) {
     const dx = targetLaneX - this.position.x;
-    const dz = targetRowZ - this.position.z;
-    const safeX = 0.04;
-    const safeZ = 0.04;
-    moveDir.x = Math.abs(dx) > safeX ? Math.sign(dx) : 0;
-    moveDir.z = Math.abs(dz) > safeZ ? Math.sign(dz) : 0;
+    const desiredXVelocity = THREE.MathUtils.clamp(dx * 18, -this.speed * 3.5, this.speed * 3.5);
+    this.velocity.x = THREE.MathUtils.damp(this.velocity.x, desiredXVelocity, 40, delta);
+    if (Math.abs(dx) < 0.035 && Math.abs(this.velocity.x) < 0.25) {
+      this.position.x = targetLaneX;
+      this.velocity.x = 0;
+    }
+    this.velocity.z = this.autoAdvance ? -this.speed : 0;
 
-    moveDir.normalize();
-
-    // Apply movement velocity
-    this.velocity.x = moveDir.x * this.speed;
-    this.velocity.z = moveDir.z * this.speed;
+    if (this.holdTile) {
+      if (!holdActive) {
+        this.failedHoldTile = this.holdTile;
+        this.holdTile = null;
+      } else {
+        const tile = this.holdTile;
+        const tileTop = tile.position.y + tile.height / 2;
+        const exitZ = tile.position.z - tile.size.depth / 2 + this.radius * 0.5;
+        this.position.x = tile.position.x;
+        this.position.y = tileTop + this.radius;
+        this.position.z += this.velocity.z * delta;
+        this.velocity.y = 0;
+        this.isGrounded = true;
+        if (this.position.z <= exitZ) {
+          this.position.z = exitZ;
+          this.holdTile = null;
+          this.velocity.y = this.jumpForce;
+          this.isGrounded = false;
+          this.mesh.position.copy(this.position);
+          this.updateTrail(0);
+          return tile;
+        }
+        this.mesh.position.copy(this.position);
+        this.updateTrail(delta);
+        return null;
+      }
+    }
 
     // Apply gravity
     this.velocity.y += this.gravity * delta;
@@ -125,12 +153,33 @@ export class Player {
       // Shattered tiles are gone from the world, so let the player fall
       // through their former position instead of colliding with an invisible tile.
       if (platform.isTouched) continue;
+      if (platform === this.failedHoldTile) continue;
       if (platform.checkCollision(this.position, this.radius)) {
         // Land on platform if falling
         if (this.velocity.y <= 0 && this.position.y >= platform.position.y) {
+          if (platform.isHoldTile) {
+            if (!holdActive) {
+              this.failedHoldTile = platform;
+              continue;
+            }
+            this.holdTile = platform;
+            this.position.x = platform.position.x;
+            this.position.y = platform.position.y + platform.height / 2 + this.radius;
+            this.velocity.y = 0;
+            this.isGrounded = true;
+            this.autoAdvance = true;
+            this.mesh.position.copy(this.position);
+            this.updateTrail(0);
+            return null;
+          }
+          this.position.x = platform.position.x;
+          this.position.z = platform.position.z;
           this.position.y = platform.position.y + platform.height / 2 + this.radius;
+          this.mesh.position.copy(this.position);
+          this.updateTrail(0);
           this.velocity.y = this.jumpForce; // Automatic bounce/jump
           this.isGrounded = true;
+          this.autoAdvance = true;
 
           // Notify platform interaction
           return platform;

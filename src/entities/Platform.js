@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export class Platform {
-  constructor(scene, position, size = { width: 3, height: 0.4, depth: 3 }) {
+  constructor(scene, position, size = { width: 3, height: 0.4, depth: 3 }, special = {}) {
     this.scene = scene;
     this.position = position;
     this.size = size;
@@ -10,6 +10,10 @@ export class Platform {
     this.isVanishing = false;
     this.vanishTimer = 0;
     this.shards = [];
+    this.isHoldTile = special.holdBeats > 0;
+    this.holdBeats = special.holdBeats || 0;
+    this.holdDuration = special.holdDuration || 0;
+    this.holdMarker = null;
 
     this.createMesh();
   }
@@ -19,9 +23,9 @@ export class Platform {
     
     // Active material (Glowing cyan/neon)
     this.activeMaterial = new THREE.MeshStandardMaterial({
-      color: 0x00ffff,
-      emissive: 0x00ffff,
-      emissiveIntensity: 0.5,
+      color: this.isHoldTile ? 0xffb84d : 0x00ffff,
+      emissive: this.isHoldTile ? 0xff7b22 : 0x00ffff,
+      emissiveIntensity: this.isHoldTile ? 0.8 : 0.5,
       roughness: 0.3,
       metalness: 0.8
     });
@@ -40,6 +44,59 @@ export class Platform {
     this.mesh.receiveShadow = true;
     this.mesh.castShadow = true;
     this.scene.add(this.mesh);
+    if (this.isHoldTile) this.createHoldMarker();
+  }
+
+  createHoldMarker() {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.45, -0.8);
+    shape.lineTo(0.45, -0.8);
+    shape.lineTo(0.45, 0.45);
+    shape.lineTo(1, 0.45);
+    shape.lineTo(0, 1.7);
+    shape.lineTo(-1, 0.45);
+    shape.lineTo(-0.45, 0.45);
+    shape.closePath();
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.95,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    this.holdMarker = new THREE.Mesh(new THREE.ShapeGeometry(shape), material);
+    this.holdMarker.rotation.x = -Math.PI / 2;
+    this.holdMarker.scale.set(1.15, Math.min(4, this.size.depth / 5), 1);
+    const entryZ = this.position.z + this.size.depth / 2 - 3;
+    this.holdMarker.position.set(
+      this.position.x,
+      this.position.y + this.height / 2 + 0.035,
+      entryZ
+    );
+    this.scene.add(this.holdMarker);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 160;
+    const context = canvas.getContext('2d');
+    context.font = 'bold 62px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.shadowColor = '#00ffff';
+    context.shadowBlur = 18;
+    context.fillStyle = '#ffffff';
+    context.fillText('HOLD', 256, 52);
+    context.font = 'bold 28px Arial';
+    context.fillText('SPACE / SCREEN ↓', 256, 118);
+    this.holdLabelTexture = new THREE.CanvasTexture(canvas);
+    this.holdLabel = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: this.holdLabelTexture,
+      transparent: true,
+      depthTest: false
+    }));
+    this.holdLabel.position.set(this.position.x, this.position.y + 1.15, entryZ);
+    this.holdLabel.scale.set(4.1, 1.35, 1);
+    this.scene.add(this.holdLabel);
   }
 
   touch() {
@@ -51,6 +108,7 @@ export class Platform {
   }
 
   shatter() {
+    this.clearHoldMarker();
     const sourceGeometry = this.mesh.geometry;
     const shardMaterial = new THREE.MeshStandardMaterial({
       color: 0x00dce8,
@@ -145,9 +203,25 @@ export class Platform {
 
   destroy() {
     this.scene.remove(this.mesh);
+    this.clearHoldMarker();
     if (this.mesh.geometry) this.mesh.geometry.dispose();
     this.activeMaterial?.dispose();
     this.disabledMaterial?.dispose();
     this.clearShards();
+  }
+
+  clearHoldMarker() {
+    if (this.holdMarker) {
+      this.scene.remove(this.holdMarker);
+      this.holdMarker.geometry.dispose();
+      this.holdMarker.material.dispose();
+      this.holdMarker = null;
+    }
+    if (this.holdLabel) {
+      this.scene.remove(this.holdLabel);
+      this.holdLabel.material.dispose();
+      this.holdLabelTexture.dispose();
+      this.holdLabel = null;
+    }
   }
 }
