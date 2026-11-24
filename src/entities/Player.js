@@ -100,6 +100,7 @@ export class Player {
   }
 
   update(delta, platforms, targetLaneX = 0, holdActive = false) {
+    const previousPosition = this.position.clone();
     const dx = targetLaneX - this.position.x;
     const desiredXVelocity = THREE.MathUtils.clamp(dx * 18, -this.speed * 3.5, this.speed * 3.5);
     this.velocity.x = THREE.MathUtils.damp(this.velocity.x, desiredXVelocity, 40, delta);
@@ -137,7 +138,8 @@ export class Player {
       }
     }
 
-    // Apply gravity
+    // Apply gravity, then check the whole movement step so a fast frame cannot
+    // move the ball from above a tile to below it without a collision check.
     this.velocity.y += this.gravity * delta;
 
     // Update position
@@ -154,36 +156,44 @@ export class Player {
       // through their former position instead of colliding with an invisible tile.
       if (platform.isTouched) continue;
       if (platform === this.failedHoldTile) continue;
-      if (platform.checkCollision(this.position, this.radius)) {
-        // Land on platform if falling
-        if (this.velocity.y <= 0 && this.position.y >= platform.position.y) {
-          if (platform.isHoldTile) {
-            if (!holdActive) {
-              this.failedHoldTile = platform;
-              continue;
-            }
-            this.holdTile = platform;
-            this.position.x = platform.position.x;
-            this.position.y = platform.position.y + platform.height / 2 + this.radius;
-            this.velocity.y = 0;
-            this.isGrounded = true;
-            this.autoAdvance = true;
-            this.mesh.position.copy(this.position);
-            this.updateTrail(0);
-            return null;
+      const platformTop = platform.position.y + platform.height / 2;
+      const crossedPlatformTop = previousPosition.y - this.radius >= platformTop
+        && this.position.y - this.radius <= platformTop;
+      const overlapsPlatformXZ = this.position.x >= platform.position.x - platform.size.width / 2 - this.radius
+        && this.position.x <= platform.position.x + platform.size.width / 2 + this.radius
+        && this.position.z >= platform.position.z - platform.size.depth / 2 - this.radius
+        && this.position.z <= platform.position.z + platform.size.depth / 2 + this.radius;
+
+      if (this.velocity.y <= 0 && crossedPlatformTop && overlapsPlatformXZ) {
+        // Place the ball on the surface at the crossing point to prevent tunneling.
+        this.position.y = platformTop + this.radius;
+        this.mesh.position.copy(this.position);
+        if (platform.isHoldTile) {
+          if (!holdActive) {
+            this.failedHoldTile = platform;
+            continue;
           }
+          this.holdTile = platform;
           this.position.x = platform.position.x;
-          this.position.z = platform.position.z;
           this.position.y = platform.position.y + platform.height / 2 + this.radius;
-          this.mesh.position.copy(this.position);
-          this.updateTrail(0);
-          this.velocity.y = this.jumpForce; // Automatic bounce/jump
+          this.velocity.y = 0;
           this.isGrounded = true;
           this.autoAdvance = true;
-
-          // Notify platform interaction
-          return platform;
+          this.mesh.position.copy(this.position);
+          this.updateTrail(0);
+          return null;
         }
+        this.position.x = platform.position.x;
+        this.position.z = platform.position.z;
+        this.position.y = platform.position.y + platform.height / 2 + this.radius;
+        this.mesh.position.copy(this.position);
+        this.updateTrail(0);
+        this.velocity.y = this.jumpForce; // Automatic bounce/jump
+        this.isGrounded = true;
+        this.autoAdvance = true;
+
+        // Notify platform interaction
+        return platform;
       }
     }
 
