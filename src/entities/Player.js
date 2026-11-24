@@ -37,13 +37,14 @@ export class Player {
   }
 
   createTrail() {
-    this.trailPointCount = 24;
+    this.trailPointCount = 48;
     this.trailRebuildTimer = 0;
     this.trailSampleSpacing = 0.24;
     this.trailSampleCarry = 0;
     this.trailPositions = Array.from({ length: this.trailPointCount }, (_, i) =>
       this.position.clone().add(new THREE.Vector3(0, 0, i * 0.08))
     );
+    this.trailLastPosition = this.position.clone();
     this.trailCurve = new THREE.CatmullRomCurve3(this.trailPositions);
     this.trailGeometry = new THREE.TubeGeometry(this.trailCurve, 48, 0.2, 8, false);
     this.trailMaterial = new THREE.MeshBasicMaterial({
@@ -63,28 +64,26 @@ export class Player {
   updateTrail(delta) {
     if (delta === 0) {
       this.trailSampleCarry = 0;
+      this.trailLastPosition.copy(this.position);
       this.trailPositions = Array.from({ length: this.trailPointCount }, (_, i) =>
         this.position.clone().add(new THREE.Vector3(0, 0, i * 0.08))
       );
     } else {
-      this.trailSampleCarry += this.trailPositions[0].distanceTo(this.position);
-      if (this.trailSampleCarry >= this.trailSampleSpacing) {
-        const sampleCount = Math.min(
-          this.trailPointCount,
-          Math.floor(this.trailSampleCarry / this.trailSampleSpacing)
-        );
-        const movement = this.position.clone().sub(this.trailPositions[0]);
-        const movementLength = movement.length();
-        const coveredDistance = Math.min(this.trailSampleCarry, movementLength);
-        const direction = movement.lengthSq() > 0 ? movement.normalize() : new THREE.Vector3(0, 0, -1);
-        for (let i = 0; i < sampleCount; i++) {
-          this.trailPositions.unshift(this.trailPositions[0].clone().addScaledVector(
-            direction,
-            Math.min(this.trailSampleSpacing, coveredDistance)
-          ));
+      const movement = this.position.clone().sub(this.trailLastPosition);
+      const movementLength = movement.length();
+      if (movementLength > 0) {
+        let distanceToNextSample = this.trailSampleSpacing - this.trailSampleCarry;
+        while (distanceToNextSample <= movementLength) {
+          const sample = this.trailLastPosition.clone().addScaledVector(
+            movement,
+            distanceToNextSample / movementLength
+          );
+          this.trailPositions.unshift(sample);
           this.trailPositions.pop();
+          distanceToNextSample += this.trailSampleSpacing;
         }
-        this.trailSampleCarry %= this.trailSampleSpacing;
+        this.trailSampleCarry = (this.trailSampleCarry + movementLength) % this.trailSampleSpacing;
+        this.trailLastPosition.copy(this.position);
       }
     }
     this.trailCurve.points = this.trailPositions;

@@ -8,6 +8,8 @@ export class AudioManager {
   static audioContext = null;
   static musicEnabled = false;
   static startWhenReady = false;
+  static startFromBeginningWhenReady = false;
+  static playerReady = false;
   static sfxVolume = 1;
   static musicVolume = 1;
 
@@ -105,10 +107,13 @@ export class AudioManager {
 
   static setOnlineMusicPlayer(player) {
     this.onlineMusicPlayer = player;
+    this.playerReady = true;
     if (player?.setVolume) player.setVolume(Math.round(this.musicVolume * 100));
     if (this.startWhenReady && this.selectedTrack && this.musicEnabled) {
+      const restartTrack = this.startFromBeginningWhenReady;
       this.startWhenReady = false;
-      this.startMusic(true);
+      this.startFromBeginningWhenReady = false;
+      this.startMusic(restartTrack);
     } else if (!this.musicEnabled && player?.pauseVideo) {
       player.pauseVideo();
     }
@@ -118,6 +123,7 @@ export class AudioManager {
     this.selectedTrack = track;
     this.musicEnabled = Boolean(track);
     this.startWhenReady = false;
+    this.startFromBeginningWhenReady = false;
     if (!track) this.onlineMusicPlayer?.pauseVideo?.();
     this.updateMusicButton();
   }
@@ -153,6 +159,11 @@ export class AudioManager {
 
   static startMusic(restartTrack = false) {
     if (this.musicEnabled && this.selectedTrack) {
+      if (!this.onlineMusicPlayer || !this.playerReady) {
+        this.startWhenReady = true;
+        this.startFromBeginningWhenReady ||= restartTrack;
+        return;
+      }
       if (restartTrack) {
         this.resetBeatClock();
         if (this.onlineMusicPlayer?.loadVideoById) {
@@ -160,6 +171,7 @@ export class AudioManager {
             videoId: this.selectedTrack.videoId,
             startSeconds: this.selectedTrack.startAt
           });
+          this.onlineMusicPlayer.playVideo?.();
         } else {
           this.startWhenReady = true;
         }
@@ -180,7 +192,12 @@ export class AudioManager {
   }
 
   static resumeForGame() {
-    if (!this.musicEnabled || !this.onlineMusicPlayer?.playVideo) return;
+    if (!this.musicEnabled) return;
+    if (!this.onlineMusicPlayer || !this.playerReady) {
+      this.startWhenReady = true;
+      return;
+    }
+    if (!this.onlineMusicPlayer.playVideo) return;
     const endedState = window.YT?.PlayerState?.ENDED;
     if (endedState !== undefined && this.onlineMusicPlayer.getPlayerState?.() === endedState) return;
     this.onlineMusicPlayer.playVideo();

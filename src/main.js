@@ -207,13 +207,20 @@ class App {
     musicToggle.addEventListener('click', () => AudioManager.toggleMusic());
     let youtubePlayer = null;
     let pendingTrack = null;
+    let readyTrack = null;
+    const updateStartAvailability = () => {
+      const waitingForSong = Boolean(AudioManager.selectedTrack && readyTrack !== AudioManager.selectedTrack);
+      startBtn.disabled = waitingForSong;
+      startBtn.textContent = waitingForSong ? 'LOADING SONG…' : AudioManager.selectedTrack ? 'PLAY GAME' : 'PLAY WITHOUT MUSIC';
+    };
     const selectTrack = track => {
       AudioManager.setSelectedTrack(track);
       if (!track) {
         pendingTrack = null;
+        readyTrack = null;
         musicStatus.textContent = 'No song selected. You can play without music.';
         selectedSongStatus.textContent = 'NO SONG PICKED · THE GAME WILL BE SILENT';
-        startBtn.textContent = 'PLAY WITHOUT MUSIC';
+        updateStartAvailability();
         AudioManager.updateMusicButton();
         return;
       }
@@ -222,7 +229,8 @@ class App {
       }
       musicStatus.textContent = `SELECTED · ${track.artist} — ${track.title}. Music starts when the game begins.`;
       selectedSongStatus.textContent = `SELECTED SONG · ${track.artist} — ${track.title}`;
-      startBtn.textContent = 'PLAY GAME';
+      readyTrack = null;
+      updateStartAvailability();
       if (!window.YT?.Player) {
         pendingTrack = track;
         musicStatus.textContent = `Loading player for ${track.title}…`;
@@ -235,13 +243,24 @@ class App {
           playerVars: { autoplay: 0, controls: 1, playsinline: 1, rel: 0, start: Math.floor(track.startAt) },
           events: {
             onReady: event => {
-              const readyTrack = pendingTrack ?? track;
+              const cueTrack = pendingTrack ?? AudioManager.selectedTrack ?? track;
               pendingTrack = null;
-              event.target.cueVideoById({ videoId: readyTrack.videoId, startSeconds: readyTrack.startAt });
+              event.target.cueVideoById({ videoId: cueTrack.videoId, startSeconds: cueTrack.startAt });
               AudioManager.setOnlineMusicPlayer(event.target);
+            },
+            onStateChange: event => {
+              if (event.data !== window.YT?.PlayerState?.CUED) return;
+              const cuedVideoId = event.target.getVideoData?.().video_id;
+              const cuedTrack = MUSIC_TRACKS.find(candidate => candidate.videoId === cuedVideoId);
+              if (!cuedTrack || cuedTrack !== AudioManager.selectedTrack) return;
+              readyTrack = cuedTrack;
+              musicStatus.textContent = `READY · ${cuedTrack.artist} — ${cuedTrack.title}. Start the game to play.`;
+              updateStartAvailability();
             },
             onError: () => {
               musicStatus.textContent = 'This video cannot play in an embedded player. Please choose another song.';
+              readyTrack = null;
+              updateStartAvailability();
             }
           }
         });
@@ -249,7 +268,13 @@ class App {
       }
       pendingTrack = null;
       const video = { videoId: track.videoId, startSeconds: track.startAt };
-      youtubePlayer.cueVideoById(video);
+      const currentVideoId = youtubePlayer.getVideoData?.().video_id;
+      if (currentVideoId === track.videoId && youtubePlayer.getPlayerState?.() === window.YT?.PlayerState?.CUED) {
+        readyTrack = track;
+      } else {
+        youtubePlayer.cueVideoById(video);
+      }
+      updateStartAvailability();
     };
     const difficultyGroups = [
       { title: 'EASY', tracks: track => track.bpm < 100 },
